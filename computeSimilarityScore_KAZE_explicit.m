@@ -1,33 +1,60 @@
-function scoreMean = computeSimilarityScore_KAZE_explicit(KAZEfeaturesAnchor, featROI)
+function scoreMean = computeSimilarityScore_KAZE_explicit(KAZEfeaturesAnchor, featROI, params)
 % computeSimilarityScore_KAZE_explicit
 % Computes mean similarity score between ROI and 3 anchor KAZE features.
 %
 % Inputs:
 %   KAZEfeaturesAnchor : {f1, f2, f3}, each an MxN descriptor matrix
 %   featROI            : PxN descriptor matrix (ROI)
+%   params             : dynamically set similarity function
 %
 % Output:
 %   scoreMean : mean similarity across 3 anchors
 
+
+if isempty(KAZEfeaturesAnchor) || isempty(featROI)
+    scoreMean = 0;
+    return;
+end
+
+% --- Normalize candidate descriptor type ---
+if isa(featROI, 'binaryFeatures')
+    featROI = double(featROI.Features);
+elseif iscell(featROI)
+    featROI = double(featROI{1}.Features);
+end
+
+% --- Iterate through anchors ---
 numAnchors = numel(KAZEfeaturesAnchor);
 anchorScores = zeros(1, numAnchors);
 
 for i = 1:numAnchors
-    fA = double(KAZEfeaturesAnchor{i});
-    fR = double(featROI);
+    anchor = KAZEfeaturesAnchor{i};
 
-    % Normalize each feature vector to unit length
-    fA = fA ./ vecnorm(fA,2,2);
-    fR = fR ./ vecnorm(fR,2,2);
+    if isa(anchor, 'binaryFeatures')
+        descAnchor = double(anchor.Features);
+    elseif isnumeric(anchor)
+        descAnchor = double(anchor);
+    else
+        error('Unsupported anchor descriptor type: %s', class(anchor));
+    end
 
-    % Compute cosine similarity matrix
-    simMatrix = fA * fR'; % [M_anchor x P_roi]
+    numA = size(descAnchor,1);
+    numC = size(featROI,1);
+    simVals = zeros(numA,numC);
 
-    % take the best match per anchor feature
-    maxPerAnchor = max(simMatrix, [], 2);
+    for a = 1:numA
+        descA = reshape(descAnchor(a,:),[],1);
+        for c = 1:numC
+            descC = reshape(featROI(c,:),[],1);
+            simVals(a,c) = params.similarityFunc(descA, descC);
+        end
+    end
 
-    % average similarity for this anchor
-    anchorScores(i) = mean(maxPerAnchor);
+    if params.expectHighScore
+        anchorScores(i) = max(simVals(:));
+    else
+        anchorScores(i) = 1 / (1 + min(simVals(:)));
+    end
 end
 
 % Final similarity = mean across all 3 anchors

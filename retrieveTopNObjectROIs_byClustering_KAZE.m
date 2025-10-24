@@ -41,7 +41,7 @@ for c = 1:numClusters
     [featROI, validPtsROI] = extractFeatures(roi, ptsROI);
 
     % compute explicit similarity score
-    score = computeSimilarityScore_KAZE_explicit(KAZEfeaturesAnchor, featROI);
+    score = computeSimilarityScore_KAZE_explicit(KAZEfeaturesAnchor, featROI, params);
 
     bboxes = [bboxes; bbox];
     scores = [scores; score];
